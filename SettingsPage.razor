@@ -1,0 +1,125 @@
+@page "/plugins/adjustments/local.sequentialautoshift"
+@using ETS2LA.UI.Shared.Components
+@implements IDisposable
+
+<div class="flex flex-col w-108 m-5 ml-8 gap-6">
+    <Separator Label="Sequential Auto Shift" />
+    <p class="description">Automatically shifts a sequential gearbox from RPM and gear telemetry.</p>
+
+    @if (Plugin is null)
+    {
+        <p class="description">Plugin is not loaded.</p>
+    }
+    else
+    {
+        <Switch Title="Enabled"
+                Description="Automatically sends sequential gear-up and gear-down pulses."
+                Value="@Plugin.Settings.Enabled"
+                ValueChanged="@((bool value) => Plugin.HandleAction("enabled", value))" />
+        <Switch Title="Downshift"
+                Description="Allows the plugin to downshift when RPM is low."
+                Value="@Plugin.Settings.DownshiftEnabled"
+                ValueChanged="@((bool value) => Plugin.HandleAction("downshiftEnabled", value))" />
+        <Switch Title="Start engine with ACC"
+                Description="When ACC is active and telemetry reports the engine off, sends an engine start pulse."
+                Value="@Plugin.Settings.StartEngineWhenAccActive"
+                ValueChanged="@((bool value) => Plugin.HandleAction("startEngineWhenAccActive", value))" />
+        <Switch Title="Reset gear when stopped"
+                Description="When stopped in a high forward gear, downshifts toward the selected start gear."
+                Value="@Plugin.Settings.ResetGearWhenStopped"
+                ValueChanged="@((bool value) => Plugin.HandleAction("resetGearWhenStopped", value))" />
+
+        <Slider Title="Start gear"
+                Description="Target gear used when resetting while stopped."
+                Min="1" Max="6" Step="1"
+                Value="@Plugin.Settings.StartGear"
+                ValueChanged="@((float value) => Plugin.HandleAction("startGear", value))" />
+        <Slider Title="Upshift RPM"
+                Description="Requests the next gear when engine RPM rises above this value."
+                Min="900" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.UpshiftRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("upshiftRpm", value))" />
+        <Slider Title="Downshift RPM"
+                Description="Requests a lower gear when RPM falls below this value."
+                Min="500" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.DownshiftRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("downshiftRpm", value))" />
+        <Slider Title="Kickdown RPM"
+                Description="With high throttle, downshifts below this RPM for stronger acceleration."
+                Min="500" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.KickdownRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("kickdownRpm", value))" />
+        <Slider Title="Shift cooldown (ms)"
+                Description="Minimum wait after each shift request before another shift can be sent."
+                Min="250" Max="2000" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.ShiftCooldownMs))"
+                ValueChanged="@((float value) => Plugin.HandleAction("shiftCooldownMs", value))" />
+        <Slider Title="Engine start retry (ms)"
+                Description="Minimum wait between engine start pulses while ACC remains active."
+                Min="1000" Max="10000" Step="500"
+                Value="@(Convert.ToSingle(Plugin.Settings.EngineStartRetryMs))"
+                ValueChanged="@((float value) => Plugin.HandleAction("engineStartRetryMs", value))" />
+        <Slider Title="Manual pause (ms)"
+                Description="How long shifting pauses after detecting brake or clutch input."
+                Min="0" Max="5000" Step="100"
+                Value="@(Convert.ToSingle(Plugin.Settings.ManualPauseMs))"
+                ValueChanged="@((float value) => Plugin.HandleAction("manualPauseMs", value))" />
+        <Slider Title="Minimum speed (km/h)"
+                Description="Below this speed, automatic shifting is suppressed."
+                Min="0" Max="25" Step="1"
+                Value="@(Convert.ToSingle(Plugin.Settings.MinimumSpeedKph))"
+                ValueChanged="@((float value) => Plugin.HandleAction("minimumSpeedKph", value))" />
+        <Slider Title="Stopped speed (km/h)"
+                Description="At or below this speed, high gears can be reset to the start gear."
+                Min="0" Max="5" Step="@(0.1f)"
+                Value="@(Convert.ToSingle(Plugin.Settings.StoppedSpeedKph))"
+                ValueChanged="@((float value) => Plugin.HandleAction("stoppedSpeedKph", value))" />
+
+        <Separator Label="Status" Class="mt-4" />
+        <div class="flex flex-col rounded-sm bg-control-bg-dark border border-bg-darker p-4 gap-2">
+            @foreach (var row in Plugin.StatusRows)
+            {
+                <div class="flex justify-between gap-4">
+                    <p class="text-description">@row.Key</p>
+                    <p>@row.Value</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private SequentialAutoShiftPlugin? Plugin => SequentialAutoShiftPlugin.Instance;
+
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _cts = new CancellationTokenSource();
+        _ = RefreshLoop(_cts.Token);
+    }
+
+    private async Task RefreshLoop(CancellationToken token)
+    {
+        _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+        try
+        {
+            while (await _timer.WaitForNextTickAsync(token))
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _timer?.Dispose();
+        _cts?.Dispose();
+    }
+}

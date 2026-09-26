@@ -31,8 +31,15 @@ public sealed class SequentialAutoShiftSettings
     public double ClutchThreshold { get; set; } = 0.08;
 }
 
-public sealed class SequentialAutoShiftPlugin : Plugin, IPluginUi
+public sealed class SequentialAutoShiftPlugin : Plugin
 {
+    public static SequentialAutoShiftPlugin? Instance { get; private set; }
+
+    public SequentialAutoShiftPlugin()
+    {
+        Instance = this;
+    }
+
     private const string PluginId = "local.sequentialautoshift";
     private const string SettingsFileName = "SequentialAutoShift.json";
     private const string ControlChannelId = "SequentialAutoShift.Shifter";
@@ -65,7 +72,7 @@ public sealed class SequentialAutoShiftPlugin : Plugin, IPluginUi
         Id = PluginId,
         Name = "Sequential Auto Shift",
         Description = "Automatically shifts a sequential gearbox using telemetry RPM and ETS2LA gear input pulses.",
-        Version = "0.1.0",
+        Version = "0.2.0",
         SupportedETS2LA = "*",
         AuthorName = "piggywu981",
         Tags = new[] { "Driving", "Transmission", "Utility" }
@@ -173,120 +180,22 @@ public sealed class SequentialAutoShiftPlugin : Plugin, IPluginUi
         OnDisable();
     }
 
-    public IEnumerable<PluginPage> RenderPages()
+    public SequentialAutoShiftSettings Settings => settings;
+    public string Status => status;
+    public int LastGearSeen => lastGear;
+
+    public GameTelemetryData LatestTelemetry
     {
-        GameTelemetryData data;
-        lock (sync)
+        get
         {
-            data = telemetry;
+            lock (sync)
+            {
+                return telemetry;
+            }
         }
-
-        List<UiElement> body = new()
-        {
-            new UiSwitch(
-                "Enabled",
-                "Automatically sends sequential gear-up and gear-down pulses.",
-                settings.Enabled,
-                "enabled"),
-            new UiSwitch(
-                "Downshift",
-                "Allows the plugin to downshift when RPM is low.",
-                settings.DownshiftEnabled,
-                "downshiftEnabled"),
-            new UiSwitch(
-                "Start engine with ACC",
-                "When ACC is active and telemetry reports the engine off, sends an engine start pulse.",
-                settings.StartEngineWhenAccActive,
-                "startEngineWhenAccActive"),
-            new UiSwitch(
-                "Reset gear when stopped",
-                "When stopped in a high forward gear, downshifts toward the selected start gear.",
-                settings.ResetGearWhenStopped,
-                "resetGearWhenStopped"),
-            new UiSlider(
-                "Start gear",
-                "Target gear used when resetting while stopped.",
-                1,
-                6,
-                1,
-                settings.StartGear,
-                "startGear"),
-            new UiSlider(
-                "Upshift RPM",
-                "Requests the next gear when engine RPM rises above this value.",
-                900,
-                BuildRpmSliderMax(data),
-                50,
-                settings.UpshiftRpm,
-                "upshiftRpm"),
-            new UiSlider(
-                "Downshift RPM",
-                "Requests a lower gear when RPM falls below this value.",
-                500,
-                BuildRpmSliderMax(data),
-                50,
-                settings.DownshiftRpm,
-                "downshiftRpm"),
-            new UiSlider(
-                "Kickdown RPM",
-                "With high throttle, downshifts below this RPM for stronger acceleration.",
-                500,
-                BuildRpmSliderMax(data),
-                50,
-                settings.KickdownRpm,
-                "kickdownRpm"),
-            new UiSlider(
-                "Shift cooldown (ms)",
-                "Minimum wait after each shift request before another shift can be sent.",
-                250,
-                2000,
-                50,
-                settings.ShiftCooldownMs,
-                "shiftCooldownMs"),
-            new UiSlider(
-                "Engine start retry (ms)",
-                "Minimum wait between engine start pulses while ACC remains active.",
-                1000,
-                10000,
-                500,
-                settings.EngineStartRetryMs,
-                "engineStartRetryMs"),
-            new UiSlider(
-                "Manual pause (ms)",
-                "How long shifting pauses after detecting brake or clutch input.",
-                0,
-                5000,
-                100,
-                settings.ManualPauseMs,
-                "manualPauseMs"),
-            new UiSlider(
-                "Minimum speed (km/h)",
-                "Below this speed, automatic shifting is suppressed.",
-                0,
-                25,
-                1,
-                settings.MinimumSpeedKph,
-                "minimumSpeedKph"),
-            new UiSlider(
-                "Stopped speed (km/h)",
-                "At or below this speed, high gears can be reset to the start gear.",
-                0,
-                5,
-                0.1,
-                settings.StoppedSpeedKph,
-                "stoppedSpeedKph"),
-            BuildStatusTable(data)
-        };
-
-        yield return new PluginPage(
-            "sequential-auto-shift",
-            PluginPageLocation.Settings,
-            "Sequential Auto Shift",
-            "Automatically shifts a sequential gearbox from RPM and gear telemetry.",
-            body);
     }
 
-    public void OnAction(string actionId, object? value)
+    public void HandleAction(string actionId, object? value)
     {
         switch (actionId)
         {
@@ -485,11 +394,12 @@ public sealed class SequentialAutoShiftPlugin : Plugin, IPluginUi
         return true;
     }
 
-    private static bool IsAccActive()
+    public static bool IsAccActive()
     {
         ApplicationState state = ApplicationState.Current;
-        return state.DesiredLongitudinalLevel == LongitudinalAssists.AdaptiveCruiseControl
-            && !state.PauseLongitudinalAssist;
+        // Longitudinal assist (ACC) is active whenever assists are enabled and
+        // the user hasn't selected lane-assist-only mode.
+        return state.EnableAssists && state.DrivingMode != DrivingMode.LaneAssistOnly;
     }
 
     private bool ShouldUpshift(GameTelemetryData data, int gear, float rpm)
@@ -740,34 +650,39 @@ public sealed class SequentialAutoShiftPlugin : Plugin, IPluginUi
             settingsHandler?.Save(SettingsFileName, settings);
     }
 
-    private UiTable BuildStatusTable(GameTelemetryData data)
+    public Dictionary<string, string> StatusRows
     {
-        string maxRpm = data.configFloat.engineRpmMax > 0 ? $"{data.configFloat.engineRpmMax:0}" : "unknown";
-        return new UiTable(
-            "Status",
-            new[] { "Value", "Current" },
-            new[]
+        get
+        {
+            GameTelemetryData data = LatestTelemetry;
+            string maxRpm = data.configFloat.engineRpmMax > 0 ? $"{data.configFloat.engineRpmMax:0}" : "unknown";
+            return new Dictionary<string, string>
             {
-                new[] { "State", status },
-                new[] { "Gear", FormatGear(data.truckInt.gear) },
-                new[] { "RPM", $"{data.truckFloat.engineRpm:0} / {maxRpm}" },
-                new[] { "Speed", $"{UnitConversions.FromScientificUnits(UnitType.Speed, data.truckFloat.speed, Units.Metric):0} km/h" },
-                new[] { "ACC active", IsAccActive() ? "Yes" : "No" },
-                new[] { "Engine", data.truckBool.engineEnabled ? "On" : "Off" },
-                new[] { "Start gear", settings.StartGear.ToString() },
-                new[] { "Last gear seen", FormatGear(lastGear) }
-            });
+                { "State", status },
+                { "Gear", FormatGear(data.truckInt.gear) },
+                { "RPM", $"{data.truckFloat.engineRpm:0} / {maxRpm}" },
+                { "Speed", $"{UnitConversions.FromScientificUnits(UnitType.Speed, data.truckFloat.speed, Units.Metric):0} km/h" },
+                { "ACC active", IsAccActive() ? "Yes" : "No" },
+                { "Engine", data.truckBool.engineEnabled ? "On" : "Off" },
+                { "Start gear", settings.StartGear.ToString() },
+                { "Last gear seen", FormatGear(lastGear) }
+            };
+        }
     }
 
-    private static double BuildRpmSliderMax(GameTelemetryData data)
+    public float UpshiftRpmSliderMax
     {
-        if (data.configFloat.engineRpmMax > 1800)
-            return Math.Clamp(Math.Ceiling(data.configFloat.engineRpmMax / 100.0) * 100, 2200, 3500);
+        get
+        {
+            GameTelemetryData data = LatestTelemetry;
+            if (data.configFloat.engineRpmMax > 1800)
+                return (float)Math.Clamp(Math.Ceiling(data.configFloat.engineRpmMax / 100.0) * 100, 2200, 3500);
 
-        return 2500;
+            return 2500;
+        }
     }
 
-    private static string FormatGear(int gear)
+    public static string FormatGear(int gear)
     {
         if (gear > 0)
             return gear.ToString();
