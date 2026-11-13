@@ -138,7 +138,7 @@ public sealed class SequentialAutoShiftPlugin : Plugin
         Name = "Sequential Auto Shift",
         Description = "Sequential gearbox auto shifting from a throttle-interpolated shift schedule with gear-ratio landing checks and closed-loop shift verification.",
         Version = "0.3.0",
-        SupportedETS2LA = "*",
+        AppVersionSupport = new PluginVersionSupport { LowerBound = "", UpperBound = "" },
         AuthorName = "piggywu981",
         Tags = new[] { "Driving", "Transmission", "Utility" }
     };
