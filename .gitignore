@@ -10,3 +10,4 @@ obj/
 *.swo
 *~
 .DS_Store
+.mimosa/

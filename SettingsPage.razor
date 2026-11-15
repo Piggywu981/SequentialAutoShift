@@ -1,120 +1,186 @@
 @page "/plugins/adjustments/local.sequentialautoshift"
 @using ETS2LA.UI.Shared.Components
+@using ETS2LA.Translations
 @implements IDisposable
 
 <div class="flex flex-col w-108 m-5 ml-8 gap-6">
     <Separator Label="Sequential Auto Shift" />
-    <p class="description">Shifts a sequential gearbox from a throttle-interpolated shift schedule, checked against the gear ratios before a pulse is sent.</p>
+    <p class="description">@(T._("Shifts a sequential gearbox from a throttle-interpolated schedule, checked against the gear ratios before a pulse is sent."))</p>
 
     @if (Plugin is null)
     {
-        <p class="description">Plugin is not loaded.</p>
+        <p class="description">@(T._("Plugin is not loaded."))</p>
     }
     else
     {
-        <Switch Title="Enabled"
-                Description="Automatically sends sequential gear-up and gear-down pulses."
+        <Separator Label=@(T._("Behaviour")) />
+        <Switch Title=@(T._("Enabled"))
+                Description=@(T._("Automatically sends sequential gear-up and gear-down pulses."))
                 Value="@Plugin.Settings.Enabled"
                 ValueChanged="@((bool value) => Plugin.HandleAction("enabled", value))" />
-        <Switch Title="Downshift"
-                Description="Allows the plugin to downshift when RPM falls below the downshift line."
+        <Switch Title=@(T._("Downshift"))
+                Description=@(T._("Allows the plugin to downshift when the engine speed falls under the downshift line."))
                 Value="@Plugin.Settings.DownshiftEnabled"
                 ValueChanged="@((bool value) => Plugin.HandleAction("downshiftEnabled", value))" />
-        <Switch Title="Coast downshift"
-                Description="Keep downshifting while the throttle is lifted or the brakes are applied, so the engine keeps braking. Upshifts stay blocked during braking."
+        <Switch Title=@(T._("Coast downshift"))
+                Description=@(T._("Keep downshifting while the throttle is lifted or the brakes are applied. Upshifts stay blocked during braking."))
                 Value="@Plugin.Settings.CoastDownshiftEnabled"
                 ValueChanged="@((bool value) => Plugin.HandleAction("coastDownshiftEnabled", value))" />
-        <Switch Title="Adapt to load and gradient"
-                Description="Raise both shift lines when the truck demands throttle but does not accelerate, or when it is heavily loaded."
+        <Switch Title=@(T._("Adapt to load and gradient"))
+                Description=@(T._("Raise both shift lines when the truck demands throttle but does not accelerate, or when it is heavily loaded."))
                 Value="@Plugin.Settings.AdaptiveShiftPoints"
                 ValueChanged="@((bool value) => Plugin.HandleAction("adaptiveShiftPoints", value))" />
-        <Switch Title="Start engine with ACC"
-                Description="When ACC is active and telemetry reports the engine off, sends an ignition and crank pulse."
-                Value="@Plugin.Settings.StartEngineWhenAccActive"
-                ValueChanged="@((bool value) => Plugin.HandleAction("startEngineWhenAccActive", value))" />
-        <Switch Title="Reset gear when stopped"
-                Description="After the truck has been stopped for the dwell time, downshift toward the selected start gear."
+        <Switch Title=@(T._("Hold the gear for engine braking"))
+                Description=@(T._("With the exhaust brake or retarder on, or on a long descent, pull the gearbox down into the braking band instead of idling."))
+                Value="@Plugin.Settings.HoldGearForEngineBrake"
+                ValueChanged="@((bool value) => Plugin.HandleAction("holdGearForEngineBrake", value))" />
+        <Switch Title=@(T._("Skip gears when lightly loaded"))
+                Description=@(T._("Skip an intermediate gear when the truck is light and the gear ratios say the engine will stay in its band."))
+                Value="@Plugin.Settings.AllowSkipShift"
+                ValueChanged="@((bool value) => Plugin.HandleAction("allowSkipShift", value))" />
+        <Switch Title=@(T._("Start gear follows the load"))
+                Description=@(T._("Pull away in a higher gear when the truck is empty, and in the selected start gear when it is loaded."))
+                Value="@Plugin.Settings.AdaptiveStartGear"
+                ValueChanged="@((bool value) => Plugin.HandleAction("adaptiveStartGear", value))" />
+        <Switch Title=@(T._("Avoid shifting in turns"))
+                Description=@(T._("Hold the upshift while the steering wheel is turned at low speed, so the drive is not interrupted mid-corner."))
+                Value="@Plugin.Settings.AvoidShiftingInTurns"
+                ValueChanged="@((bool value) => Plugin.HandleAction("avoidShiftingInTurns", value))" />
+        <Switch Title=@(T._("Use road gradient"))
+                Description=@(T._("Read the truck pitch as a slope signal, in addition to the acceleration estimate. The sign is learned on the first climb."))
+                Value="@Plugin.Settings.UseGradeSignal"
+                ValueChanged="@((bool value) => Plugin.HandleAction("useGradeSignal", value))" />
+        <Switch Title=@(T._("Reset gear when stopped"))
+                Description=@(T._("After the truck has been stopped for the dwell time, walk the gearbox down to the start gear in bursts."))
                 Value="@Plugin.Settings.ResetGearWhenStopped"
                 ValueChanged="@((bool value) => Plugin.HandleAction("resetGearWhenStopped", value))" />
 
-        <Separator Label="Shift schedule" />
-        <p class="description">The lines are interpolated across throttle travel, so the low values apply when coasting and the high values at full throttle.</p>
-        <Slider Title="Upshift RPM (no throttle)" Suffix="rpm"
-                Description="Engine speed to reach before an upshift with the throttle closed. Never above 97% of the truck's redline."
+        <Separator Label=@(T._("Shift schedule")) />
+        <p class="description">@(T._("The lines are interpolated across throttle travel: the low values apply when coasting, the high values at full throttle."))</p>
+        <Slider Title=@(T._("Upshift RPM (no throttle)")) Suffix="rpm"
+                Description=@(T._("Engine speed to reach before an upshift with the throttle closed."))
                 Min="900" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
                 Value="@Plugin.UpshiftRpmSliderValue"
                 ValueChanged="@((float value) => Plugin.HandleAction("upshiftRpm", value))" />
-        <Slider Title="Upshift RPM (full throttle)" Suffix="rpm"
-                Description="Engine speed to reach before an upshift at full throttle. Never above 97% of the truck's redline."
+        <Slider Title=@(T._("Upshift RPM (full throttle)")) Suffix="rpm"
+                Description=@(T._("Engine speed to reach before an upshift at full throttle."))
                 Min="900" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
                 Value="@Plugin.UpshiftFullThrottleSliderValue"
                 ValueChanged="@((float value) => Plugin.HandleAction("upshiftRpmFullThrottle", value))" />
-        <Slider Title="Downshift RPM (no throttle)" Suffix="rpm"
-                Description="Engine speed that triggers a downshift with the throttle closed."
+        <Slider Title=@(T._("Downshift RPM (no throttle)")) Suffix="rpm"
+                Description=@(T._("Engine speed that triggers a downshift with the throttle closed."))
                 Min="500" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
                 Value="@(Convert.ToSingle(Plugin.Settings.DownshiftRpm))"
                 ValueChanged="@((float value) => Plugin.HandleAction("downshiftRpm", value))" />
-        <Slider Title="Kickdown RPM (full throttle)" Suffix="rpm"
-                Description="Engine speed that triggers a downshift at full throttle for maximum pull."
+        <Slider Title=@(T._("Kickdown RPM (full throttle)")) Suffix="rpm"
+                Description=@(T._("Engine speed that triggers a downshift at full throttle for maximum pull."))
                 Min="500" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
                 Value="@(Convert.ToSingle(Plugin.Settings.KickdownRpm))"
                 ValueChanged="@((float value) => Plugin.HandleAction("kickdownRpm", value))" />
-        <Slider Title="Landing margin" Suffix="rpm"
-                Description="An upshift is skipped unless the gear ratios say the engine will land this much above the downshift line. This is what stops 1-2-1 hunting."
+        <Slider Title=@(T._("Kickdown boost on a throttle stab")) Suffix="rpm"
+                Description=@(T._("Extra engine speed demanded when the throttle is stabbed rather than squeezed, so a pull request is answered immediately."))
+                Min="0" Max="800" Step="25"
+                Value="@(Convert.ToSingle(Plugin.Settings.KickdownBoostRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("kickdownBoostRpm", value))" />
+        <Slider Title=@(T._("Braking downshift RPM")) Suffix="rpm"
+                Description=@(T._("Downshift line while the service brake is applied, so a gear is always in hand for the corner exit."))
+                Min="500" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.BrakeDownshiftRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("brakeDownshiftRpm", value))" />
+        <Slider Title=@(T._("Engine braking band")) Suffix="rpm"
+                Description=@(T._("Engine speed the gearbox is pulled down to while the exhaust brake or retarder is on. Below this the brake has no revs to work with."))
+                Min="900" Max="@Plugin.UpshiftRpmSliderMax" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.EngineBrakeBandRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("engineBrakeBandRpm", value))" />
+
+        <Separator Label=@(T._("Landing and hunting")) />
+        <p class="description">@(T._("Every shift is projected through the gear ratios. A gear may only be entered when the engine lands inside the band below, which is what produces per-gear shift points and removes 1-2-1 hunting."))</p>
+        <Slider Title=@(T._("Lug floor")) Suffix="rpm"
+                Description=@(T._("Lowest engine speed a gear may be entered at. This, not the upshift line, decides the shift point of every low gear."))
+                Min="700" Max="2000" Step="25"
+                Value="@(Convert.ToSingle(Plugin.Settings.LugFloorRpm))"
+                ValueChanged="@((float value) => Plugin.HandleAction("lugFloorRpm", value))" />
+        <Slider Title=@(T._("Landing margin")) Suffix="rpm"
+                Description=@(T._("Extra room kept between the downshift line and the lug floor when the load estimate raises the lines."))
                 Min="100" Max="800" Step="25"
                 Value="@(Convert.ToSingle(Plugin.Settings.ShiftHysteresisRpm))"
                 ValueChanged="@((float value) => Plugin.HandleAction("shiftHysteresisRpm", value))" />
-        <Slider Title="Start gear"
-                Description="Lowest gear the plugin will downshift into, and the gear it resets to when stopped."
+        <Slider Title=@(T._("Start gear"))
+                Description=@(T._("Lowest gear the plugin will downshift into, and the gear it resets to when stopped."))
                 Min="1" Max="6" Step="1"
                 Value="@Plugin.Settings.StartGear"
                 ValueChanged="@((float value) => Plugin.HandleAction("startGear", value))" />
+        <Slider Title=@(T._("Maximum gears skipped"))
+                Description=@(T._("How many gears a single request may take. Skipping is also bounded by the gear ratios and the load."))
+                Min="1" Max="3" Step="1"
+                Value="@Plugin.Settings.MaxSkipGears"
+                ValueChanged="@((float value) => Plugin.HandleAction("maxSkipGears", value))" />
+        <Slider Title="Loaded mass (t)"
+                Description=@(T._("Above this combined truck and cargo mass the truck counts as loaded: no gear skipping, and the start gear stays low."))
+                Min="5" Max="60" Step="@(0.5f)"
+                Value="@(Convert.ToSingle(Plugin.Settings.LoadedMassKg / 1000))"
+                ValueChanged="@((float value) => Plugin.HandleAction("loadedMassKg", value * 1000))" />
 
-        <Separator Label="Timing" />
-        <Slider Title="Minimum time in gear (ms)"
-                Description="Wait after a confirmed shift before another one may be requested."
+        <Separator Label=@(T._("Timing")) />
+        <Slider Title=@(T._("Minimum time in gear (ms)"))
+                Description=@(T._("Wait after a confirmed shift before another one may be requested."))
                 Min="250" Max="2000" Step="50"
                 Value="@(Convert.ToSingle(Plugin.Settings.ShiftCooldownMs))"
                 ValueChanged="@((float value) => Plugin.HandleAction("shiftCooldownMs", value))" />
-        <Slider Title="Manual takeover pause (ms)"
-                Description="How long shifting waits after the clutch is pressed or a gear change the plugin did not request is seen. Braking only blocks upshifts."
+        <Slider Title=@(T._("Settling time after a shift (ms)"))
+                Description=@(T._("Time a new gear gets before the opposite shift is allowed again. This is what stops a shift from being undone on the next tick."))
+                Min="0" Max="3000" Step="50"
+                Value="@(Convert.ToSingle(Plugin.Settings.PostDownshiftDwellMs))"
+                ValueChanged="@((float value) => Plugin.HandleAction("postDownshiftDwellMs", value))" />
+        <Slider Title=@(T._("Manual takeover pause (ms)"))
+                Description=@(T._("How long shifting waits after the clutch pedal is pressed or a gear change the plugin did not request is seen."))
                 Min="0" Max="5000" Step="100"
                 Value="@(Convert.ToSingle(Plugin.Settings.ManualPauseMs))"
                 ValueChanged="@((float value) => Plugin.HandleAction("manualPauseMs", value))" />
-        <Slider Title="Stop dwell (ms)"
-                Description="How long the truck must stay under the stopped speed before its gear is reset."
+        <Slider Title=@(T._("Stop dwell (ms)"))
+                Description=@(T._("How long the truck must stay under the stopped speed before its gear is reset."))
                 Min="0" Max="5000" Step="100"
                 Value="@(Convert.ToSingle(Plugin.Settings.StopDwellMs))"
                 ValueChanged="@((float value) => Plugin.HandleAction("stopDwellMs", value))" />
-        <Slider Title="Engine start retry (ms)"
-                Description="Minimum wait between engine start pulses while ACC remains active."
-                Min="1000" Max="10000" Step="500"
-                Value="@(Convert.ToSingle(Plugin.Settings.EngineStartRetryMs))"
-                ValueChanged="@((float value) => Plugin.HandleAction("engineStartRetryMs", value))" />
 
-        <Separator Label="Input thresholds" />
-        <Slider Title="@($"Minimum upshift speed ({SpeedLabel})")" Suffix="@SpeedLabel"
-                Description="Below this speed no upshift is requested. Downshifts stay available so a slow truck can find a lower gear."
+        <Separator Label=@(T._("Input thresholds")) />
+        <Slider Title=@($"Minimum upshift speed ({SpeedLabel})") Suffix="@SpeedLabel"
+                Description=@(T._("Below this speed no upshift is requested. Downshifts stay available so a slow truck can find a lower gear."))
                 Min="0" Max="@MaxUpshiftSpeed" Step="1"
                 Value="@MinimumUpshiftSpeed"
                 ValueChanged="@((float value) => Plugin.HandleAction("minimumSpeedKph", value))" />
-        <Slider Title="@($"Stopped speed ({SpeedLabel})")" Suffix="@SpeedLabel"
-                Description="At or below this speed the truck counts as stopped for the gear reset."
+        <Slider Title=@($"Stopped speed ({SpeedLabel})") Suffix="@SpeedLabel"
+                Description=@(T._("At or below this speed the truck counts as stopped for the gear reset."))
                 Min="0" Max="@MaxStoppedSpeed" Step="@(0.1f)"
                 Value="@StoppedSpeed"
                 ValueChanged="@((float value) => Plugin.HandleAction("stoppedSpeedKph", value))" />
-        <Slider Title="Brake threshold"
-                Description="Brake travel (0-1) that counts as the driver braking."
+        <Slider Title=@(T._("Brake threshold"))
+                Description=@(T._("Brake travel (0-1) that counts as the driver braking."))
                 Min="@(0.01f)" Max="1" Step="@(0.01f)"
                 Value="@(Convert.ToSingle(Plugin.Settings.BrakeThreshold))"
                 ValueChanged="@((float value) => Plugin.HandleAction("brakeThreshold", value))" />
-        <Slider Title="Clutch threshold"
-                Description="Clutch travel (0-1) that counts as the driver taking over the gearbox."
+        <Slider Title=@(T._("Clutch threshold"))
+                Description=@(T._("Clutch pedal travel (0-1) that counts as the driver taking the gearbox over. The clutch the game applies for its own shifts is not counted."))
                 Min="@(0.01f)" Max="1" Step="@(0.01f)"
                 Value="@(Convert.ToSingle(Plugin.Settings.ClutchThreshold))"
                 ValueChanged="@((float value) => Plugin.HandleAction("clutchThreshold", value))" />
+        <Slider Title=@(T._("Turn steering threshold"))
+                Description=@(T._("Steering travel (0-1) that counts as a turn for the upshift hold."))
+                Min="@(0.05f)" Max="1" Step="@(0.01f)"
+                Value="@(Convert.ToSingle(Plugin.Settings.TurnSteerThreshold))"
+                ValueChanged="@((float value) => Plugin.HandleAction("turnSteerThreshold", value))" />
+        <Slider Title=@($"Turn speed limit ({SpeedLabel})") Suffix="@SpeedLabel"
+                Description=@(T._("The upshift hold only applies below this speed. Above it a turn is a highway bend and shifting normally is fine."))
+                Min="0" Max="@MaxTurnSpeed" Step="1"
+                Value="@TurnSpeed"
+                ValueChanged="@((float value) => Plugin.HandleAction("turnMaxSpeedKph", value))" />
+        <Slider Title=@(T._("Full-slope gradient (%)"))
+                Description=@(T._("Gradient that counts as a full slope when the shift lines are raised."))
+                Min="1" Max="20" Step="@(0.5f)"
+                Value="@(Convert.ToSingle(Plugin.Settings.GradeFullSlope * 100))"
+                ValueChanged="@((float value) => Plugin.HandleAction("gradeFullSlope", value / 100))" />
 
-        <Separator Label="Status" Class="mt-4" />
+        <Separator Label=@(T._("Status")) Class="mt-4" />
         <div class="flex flex-col rounded-sm bg-control-bg-dark border border-bg-darker p-4 gap-2">
             @foreach (var row in Plugin.StatusRows)
             {
@@ -133,8 +199,10 @@
     private string SpeedLabel => SequentialAutoShiftPlugin.SpeedUnitLabel;
     private float MaxUpshiftSpeed => SequentialAutoShiftPlugin.SpeedFromKmh(25);
     private float MaxStoppedSpeed => SequentialAutoShiftPlugin.SpeedFromKmh(5);
+    private float MaxTurnSpeed => SequentialAutoShiftPlugin.SpeedFromKmh(90);
     private float MinimumUpshiftSpeed => Plugin is null ? 0 : SequentialAutoShiftPlugin.SpeedFromKmh(Plugin.Settings.MinimumSpeedKph);
     private float StoppedSpeed => Plugin is null ? 0 : SequentialAutoShiftPlugin.SpeedFromKmh(Plugin.Settings.StoppedSpeedKph);
+    private float TurnSpeed => Plugin is null ? 0 : SequentialAutoShiftPlugin.SpeedFromKmh(Plugin.Settings.TurnMaxSpeedKph);
 
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;

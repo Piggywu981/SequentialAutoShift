@@ -39,6 +39,10 @@
       <HintPath>..\..\ETS2LA-win-release-Portable\current\ETS2LA.State.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="ETS2LA.Translations">
+      <HintPath>..\..\ETS2LA-win-release-Portable\current\ETS2LA.Translations.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="ETS2LA.UI">
       <HintPath>..\..\ETS2LA-win-release-Portable\current\ETS2LA.UI.dll</HintPath>
       <Private>false</Private>
